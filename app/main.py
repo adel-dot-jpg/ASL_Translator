@@ -14,6 +14,7 @@ import torchvision.transforms.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #functionify the main loop bitch
+# update model.py with the new one and then run the weights
 
 # Download the hand landmarker model if not already present
 model_path = 'hand_landmarker.task'
@@ -32,17 +33,10 @@ translator_model = initialize_model()
 IMG_WIDTH = 28 # based on expected input from inference model
 IMG_HEIGHT = 28
 
-def preprocess_trans(intake):
-    # BGR → GRAY (match training)
-	gray = cv2.cvtColor(cropped_hand, cv2.COLOR_BGR2GRAY)
-	# Resize
-	gray = cv2.resize(gray, (IMG_WIDTH, IMG_HEIGHT), interpolation=cv2.INTER_AREA)
-	# Normalize
-	gray = gray.astype("float32") / 255.0
-	# Convert to torch tensor
-	processed_image = torch.from_numpy(gray)
-	# Add channel dimension [1, 28, 28]
-	processed_image = processed_image.unsqueeze(0)
+preprocess_trans = transforms.Compose([
+    transforms.ToDtype(torch.float32, scale=True), # Converts [0, 255] to [0, 1]
+    transforms.Resize((IMG_WIDTH, IMG_HEIGHT)),
+])
 
 # Create HandLandmarker options
 base_options = python.BaseOptions(model_asset_path=model_path)
@@ -54,13 +48,18 @@ options = vision.HandLandmarkerOptions(
 	min_tracking_confidence=0.5 		# default 0.5
 )
 
+# Alphabet does not contain j or z because they require movement
+ALPHABET = "abcdefghiklmnopqrstuvwxy"
+
+CONFIDENCE_THRESHOLD = 0.8 # model output probability threshold to interpret a letter
+
 # Initialize video capture
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 7200)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 400)
 
-window_name = 'ASL translator'
-cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+WINDOW_NAME = 'ASL translator'
+cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 
 # Create the hand landmarker
 alive = True
@@ -108,32 +107,42 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 				# use rectangle to crop frame for preprocessing
 				cropped_hand = frame[y_min:y_max, x_min:x_max] # [start_y:end_y, start_x:end_x]
 
-				# preprocess the hand for input to model
-				processed_image = preprocess_trans(cropped_hand) # i hope this works
+				# preprocess the hand for input to model (expects input of form torch.Size([1, 1, 28, 28]))
+				cropped_hand_gray = cv2.cvtColor(cropped_hand, cv2.COLOR_BGR2GRAY) # greyscale
+				cropped_hand_tensor = torch.from_numpy(cropped_hand_gray)      # [H, W]         (base from numpy)
+				cropped_hand_tensor = cropped_hand_tensor.unsqueeze(0)         # [1, H, W]      (channel dimension added, this is what the preprocess_trans will expect as input)
+				processed_image = preprocess_trans(cropped_hand_tensor)        # [1, 28, 28]    (resized)
+				batched_image = processed_image.unsqueeze(0)                   # [1, 1, 28, 28] (added batch dimension)
 
 				# make sure both model and intake are on the same device
-				batched_image_gpu = processed_image.to(device)
+				batched_image_gpu = batched_image.to(device)
 
 				# send input to model to recieve output
 				output = translator_model(batched_image_gpu)
-				print(output)
+				probs = torch.softmax(output, dim=1)          # softmax to turn logit outputs to percentage for confidence thresholding
+				max_prob, max_index = probs.max(dim=1)
+				conf = max_prob.item()
+				prediction = max_index.item()
+
+				if conf >= CONFIDENCE_THRESHOLD:
+					letter = ALPHABET[prediction]
+					print(f"{letter} ({conf:.3f} confidence)")
 
 				
-				
-				# Draw hand landmarks (dont need em though)
+				# Draw hand landmarks (dont need them though)
 				# for landmark in hand_landmarks:
 				#     x = int(landmark.x * w)
 				#     y = int(landmark.y * h)
 				#     cv2.circle(frame, (x, y), 3, (255, 0, 0), -1)
 		
 		# Display the frame
-		cv2.imshow(window_name, frame)
+		cv2.imshow(WINDOW_NAME, frame)
 		
-		# Exit 
+		# Exit
 		key = cv2.waitKey(1)
 		if key == ord("Q") or key == ord("q") or key == 27:
 			alive = False
-		elif cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+		elif cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
 			alive = False
 
 # Release resources
