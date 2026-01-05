@@ -3,10 +3,12 @@ import torch.nn as nn
 
 # this file rebuilds the model identical to how it was created from the model_weights.pth file
 
-IMG_CHS = 1
-IMG_WIDTH = 28
 IMG_HEIGHT = 28
-N_CLASSES = 24
+IMG_WIDTH = 28
+IMG_CHS = 1
+NUM_ASL_CLASSES = 24   # sign_mnist excludes J and Z
+UNKNOWN_CLASS = 24     # final class (unknown)
+N_CLASSES = 25		   # total classes
 flattened_img_size = 75 * 3 * 3
 
 class MyConvBlock(nn.Module):
@@ -41,7 +43,7 @@ def initialize_model(): # create a model instance based on the weights file
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	model = create_model().to(device)
 
-	state_dict = torch.load("model_weights.pth", map_location=device)
+	state_dict = torch.load("new_model_weights.pth", map_location=device)
 	model.load_state_dict(state_dict)
 
 	model.eval()  # IMPORTANT for inference

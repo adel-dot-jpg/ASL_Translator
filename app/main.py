@@ -10,11 +10,11 @@ from ASL_model.model import initialize_model
 import torchvision.io as tv_io
 import torchvision.transforms.v2 as transforms
 import torchvision.transforms.functional as F
+from utils import write_to_camera
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #functionify the main loop bitch
-# update model.py with the new one and then run the weights
 
 # Download the hand landmarker model if not already present
 model_path = 'hand_landmarker.task'
@@ -48,10 +48,12 @@ options = vision.HandLandmarkerOptions(
 	min_tracking_confidence=0.5 		# default 0.5
 )
 
-# Alphabet does not contain j or z because they require movement
-ALPHABET = "abcdefghiklmnopqrstuvwxy"
+padding = 70 # default 20 to get just the whole hand with no extra padding
 
-CONFIDENCE_THRESHOLD = 0.8 # model output probability threshold to interpret a letter
+# Alphabet does not contain j or z because they require movement
+ALPHABET = "abcdefghiklmnopqrstuvwxy1" # 1 means none/unknown 
+
+CONFIDENCE_THRESHOLD = 0.85 # model output probability threshold to interpret a letter
 
 # Initialize video capture
 cap = cv2.VideoCapture(0)
@@ -95,7 +97,6 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 				y_max = int(max(y_coords))
 				
 				# Add padding to the bounding box to get whole hand and then some
-				padding = 40 # default 20 to get just the whole hand with no extra padding
 				x_min = max(0, x_min - padding)
 				x_max = min(w, x_max + padding)
 				y_min = max(0, y_min - padding)
@@ -123,11 +124,12 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 				max_prob, max_index = probs.max(dim=1)
 				conf = max_prob.item()
 				prediction = max_index.item()
+				letter = ALPHABET[prediction]
 
-				if conf >= CONFIDENCE_THRESHOLD:
-					letter = ALPHABET[prediction]
-					print(f"{letter} ({conf:.3f} confidence)")
-
+				if conf >= CONFIDENCE_THRESHOLD and letter != '1':
+					write_to_camera(letter, frame, (30, 120), fill=True)
+				else:
+					write_to_camera("unrecognized", frame, (30, 120), fill=True)
 				
 				# Draw hand landmarks (dont need them though)
 				# for landmark in hand_landmarks:
