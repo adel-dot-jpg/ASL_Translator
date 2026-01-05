@@ -101,12 +101,18 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 				x_max = min(w, x_max + padding)
 				y_min = max(0, y_min - padding)
 				y_max = min(h, y_max + padding)
-				
-				# Draw rectangle around hand
-				cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
 
 				# use rectangle to crop frame for preprocessing
 				cropped_hand = frame[y_min:y_max, x_min:x_max] # [start_y:end_y, start_x:end_x]
+
+				# draw hand onto frame for reference
+				h, w = (200, 200)
+				padding_x, padding_y = (30, 30)
+				resized_hand = cv2.resize(cropped_hand, (h, w))
+				frame[0+padding_y:h+padding_y, frame.shape[1]-w-padding_x:frame.shape[1]-padding_x] = resized_hand
+
+				# Draw rectangle around hand
+				cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
 
 				# preprocess the hand for input to model (expects input of form torch.Size([1, 1, 28, 28]))
 				cropped_hand_gray = cv2.cvtColor(cropped_hand, cv2.COLOR_BGR2GRAY) # greyscale
@@ -126,10 +132,16 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 				prediction = max_index.item()
 				letter = ALPHABET[prediction]
 
+				# save coords for later
+				# if conf >= CONFIDENCE_THRESHOLD and letter != '1':
+				# 	write_to_camera(letter, frame, (0, 0), fill=True)
+				# else:
+				# 	write_to_camera("unrecognized", frame, (0, 0), fill=True)
+
 				if conf >= CONFIDENCE_THRESHOLD and letter != '1':
-					write_to_camera(letter, frame, (30, 120), fill=True)
+					write_to_camera(letter, frame, (frame.shape[1]-w+(2*padding_x), h+int(2*padding_y)), fill=True)
 				else:
-					write_to_camera("unrecognized", frame, (30, 120), fill=True)
+					write_to_camera("unrecognized", frame, (frame.shape[1]-w, h+int(2*padding_y)), fill=True)
 				
 				# Draw hand landmarks (dont need them though)
 				# for landmark in hand_landmarks:
