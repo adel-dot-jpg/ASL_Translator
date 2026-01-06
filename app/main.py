@@ -10,7 +10,8 @@ from ASL_model.model import initialize_model
 import torchvision.io as tv_io
 import torchvision.transforms.v2 as transforms
 import torchvision.transforms.functional as F
-from utils import write_to_camera
+from utils import *
+from collections import deque
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -51,7 +52,15 @@ options = vision.HandLandmarkerOptions(
 padding = 70 # default 20 to get just the whole hand with no extra padding
 
 # Alphabet does not contain j or z because they require movement
-ALPHABET = "abcdefghiklmnopqrstuvwxy1" # 1 means none/unknown 
+ALPHABET = "abcdefghiklmnopqrstuvwxy1" # 1 means none/unknown
+
+# temporal smoothing settings
+SNAPSHOT_SIZE = 25 							# how many frames count per snapshot
+MIN_VOTES = 18      						# must appear in most frames in a snapshot to count
+pred_window = deque(maxlen=SNAPSHOT_SIZE)	# snapshot deque
+
+# rolling letter queue
+caption = ""
 
 CONFIDENCE_THRESHOLD = 0.85 # model output probability threshold to interpret a letter
 
@@ -132,16 +141,25 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 				prediction = max_index.item()
 				letter = ALPHABET[prediction]
 
+				if conf >= CONFIDENCE_THRESHOLD and letter != '1':
+					write_to_camera(letter, frame, (frame.shape[1]-w+(2*padding_x), h+int(2*padding_y)), fill=True)
+					pred_window.append(letter)
+				else:
+					write_to_camera("unrecognized", frame, (frame.shape[1]-w, h+int(2*padding_y)), fill=True)
+					pred_window.append(None)
+				
+				# check snapshot
+				smoothed_prediction = get_smoothed_prediction(pred_window, MIN_VOTES)
+				if smoothed_prediction:
+					caption += smoothed_prediction
+					# empty snapshot
+					pred_window.clear()
+
 				# save coords for later
 				# if conf >= CONFIDENCE_THRESHOLD and letter != '1':
 				# 	write_to_camera(letter, frame, (0, 0), fill=True)
 				# else:
 				# 	write_to_camera("unrecognized", frame, (0, 0), fill=True)
-
-				if conf >= CONFIDENCE_THRESHOLD and letter != '1':
-					write_to_camera(letter, frame, (frame.shape[1]-w+(2*padding_x), h+int(2*padding_y)), fill=True)
-				else:
-					write_to_camera("unrecognized", frame, (frame.shape[1]-w, h+int(2*padding_y)), fill=True)
 				
 				# Draw hand landmarks (dont need them though)
 				# for landmark in hand_landmarks:
@@ -150,12 +168,19 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 				#     cv2.circle(frame, (x, y), 3, (255, 0, 0), -1)
 		
 		# Display the frame
+		#show captions
+		if caption != "":
+			write_to_camera(caption.upper(), frame, (0, 0), fill=True)
 		cv2.imshow(WINDOW_NAME, frame)
 		
 		# Exit
 		key = cv2.waitKey(1)
 		if key == ord("Q") or key == ord("q") or key == 27:
 			alive = False
+		if key == ord("R") or key == ord("r") or key == 28:
+			caption = ""
+		if key == ord('\b') or key == 8:
+			caption = caption[0:(len(caption)-1)] # get rid of the last let
 		elif cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
 			alive = False
 

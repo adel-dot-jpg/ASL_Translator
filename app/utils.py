@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from collections import Counter
 
 def write_to_camera(text: str, frame: np.ndarray, topleft_coords: tuple[int, int] = (0, 0), text_font: int = 1, text_color: tuple[int, int, int] = (255, 255, 255), fill: bool = False, fill_color: tuple[int, int, int] = (0, 0, 0), text_scale: int = 1):
 	"""write text to camera with specified options"""
@@ -35,3 +36,16 @@ def write_to_camera(text: str, frame: np.ndarray, topleft_coords: tuple[int, int
 		2,
 		cv2.LINE_AA
 )
+
+def get_smoothed_prediction(pred_window, min_votes):
+    valid_preds = [p for p in pred_window if p is not None]
+    if not valid_preds:
+        return None
+
+    counts = Counter(valid_preds)
+    label, votes = counts.most_common(1)[0]
+
+    if votes >= min_votes:
+        return label
+
+    return None
