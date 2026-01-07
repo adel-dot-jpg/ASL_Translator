@@ -7,9 +7,7 @@ import os
 import torch
 import torch.nn as nn
 from ASL_model.model import initialize_model
-import torchvision.io as tv_io
 import torchvision.transforms.v2 as transforms
-import torchvision.transforms.functional as F
 from utils import *
 from collections import deque
 
