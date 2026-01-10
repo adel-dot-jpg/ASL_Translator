@@ -6,7 +6,8 @@ import urllib.request
 import os
 import torch
 import torch.nn as nn
-from ASL_model.model import initialize_model
+from models.vision_model import initialize_model as init_vision
+from models.segmentation_model import initialize_model as init_segment, segment_text
 import torchvision.transforms.v2 as transforms
 from utils import *
 from collections import deque
@@ -27,7 +28,8 @@ if not os.path.exists(model_path):
 	else:
 		print("Model downloaded successfully")
 
-translator_model = initialize_model()
+segmentor_model, code = init_segment()
+translator_model = init_vision()
 
 IMG_WIDTH = 28 # based on expected input from inference model
 IMG_HEIGHT = 28
@@ -58,7 +60,7 @@ MIN_VOTES = 18      						# must appear in most frames in a snapshot to count
 pred_window = deque(maxlen=SNAPSHOT_SIZE)	# snapshot deque
 
 # rolling letter queue
-caption = ""
+caption = "hellomynameisadelfaruque"
 
 CONFIDENCE_THRESHOLD = 0.85 # model output probability threshold to interpret a letter
 
@@ -168,7 +170,9 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 		# Display the frame
 		#show captions
 		if caption != "":
-			write_to_camera(caption.upper(), frame, (0, 0), fill=True)
+			# segment the caption string
+			segmented_caption = segment_text(caption, segmentor_model, code, CONFIDENCE_THRESHOLD)
+			write_to_camera(segmented_caption.upper(), frame, (0, 0), fill=True)
 		cv2.imshow(WINDOW_NAME, frame)
 		
 		# Exit
