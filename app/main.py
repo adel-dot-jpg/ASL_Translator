@@ -60,7 +60,7 @@ MIN_VOTES = 18      						# must appear in most frames in a snapshot to count
 pred_window = deque(maxlen=SNAPSHOT_SIZE)	# snapshot deque
 
 # rolling letter queue
-caption = "hellomynameisadelfaruque"
+caption = ""
 
 CONFIDENCE_THRESHOLD = 0.85 # model output probability threshold to interpret a letter
 
