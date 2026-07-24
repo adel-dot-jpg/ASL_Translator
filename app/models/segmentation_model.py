@@ -22,7 +22,7 @@ class CharLSTM(nn.Module):
 
 def initialize_model():
 	# load the checkpoint file
-	checkpoint = torch.load("segmentation_model_smaller.pth")
+	checkpoint = torch.load("../segmentation_model_smaller.pth")
 
 	# We need the exact same char-to-int mapping used during training
 	config = checkpoint['config']

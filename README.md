@@ -17,7 +17,7 @@ The system is designed to run fully locally and features robustness, temporal co
 
 ## Demo
 
-using the app to spell my name based on the sign_mnist ASL alphabetx:
+using the app to spell my name based on the sign_mnist ASL alphabet:
 
 ![Live ASL Inference](https://i.imgur.com/UH4lDK0.jpeg)
 
@@ -48,3 +48,9 @@ using the app to spell my name based on the sign_mnist ASL alphabetx:
 - **Preprocessing**: The image is then transformed via tochvision to a shape acceptable by the CNN
 - **Vision Inference**: The CNN maps the image to the closest valid ASL sign it recognizes
 - **Sentence inference**: the letter is added to a string, which is then run through an LSTM to segment the letters into sentences by adding spaces where most likely applicable. for example, if the translated caption held "mynameis", then it is segmented into "my name is"
+
+### Running
+
+run from ASLtranslator\app>
+
+python main.py

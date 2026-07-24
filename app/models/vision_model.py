@@ -43,7 +43,7 @@ def initialize_model(): # create a model instance based on the weights file
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	model = create_model().to(device)
 
-	state_dict = torch.load("new_model_weights.pth", map_location=device)
+	state_dict = torch.load("../newest_try.pth", map_location=device)
 	model.load_state_dict(state_dict)
 
 	model.eval()  # IMPORTANT for inference

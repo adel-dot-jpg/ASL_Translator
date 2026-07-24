@@ -4,6 +4,7 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import urllib.request
 import os
+import time
 import torch
 import torch.nn as nn
 from models.vision_model import initialize_model as init_vision
@@ -63,6 +64,9 @@ pred_window = deque(maxlen=SNAPSHOT_SIZE)	# snapshot deque
 caption = ""
 
 CONFIDENCE_THRESHOLD = 0.85 # model output probability threshold to interpret a letter
+
+# benchmarking
+stats = SessionStats()
 
 # Initialize video capture
 cap = cv2.VideoCapture(0)
@@ -133,8 +137,11 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 				# make sure both model and intake are on the same device
 				batched_image_gpu = batched_image.to(device)
 
-				# send input to model to recieve output
+				# send input to model to recieve output, timed for latency benchmarking
+				infer_start = time.perf_counter()
 				output = translator_model(batched_image_gpu)
+				infer_time_sec = time.perf_counter() - infer_start
+
 				probs = torch.softmax(output, dim=1)          # softmax to turn logit outputs to percentage for confidence thresholding
 				max_prob, max_index = probs.max(dim=1)
 				conf = max_prob.item()
@@ -144,14 +151,20 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 				if conf >= CONFIDENCE_THRESHOLD and letter != '1':
 					write_to_camera(letter, frame, (frame.shape[1]-w+(2*padding_x), h+int(2*padding_y)), fill=True)
 					pred_window.append(letter)
+					raw_label = letter
 				else:
 					write_to_camera("unrecognized", frame, (frame.shape[1]-w, h+int(2*padding_y)), fill=True)
 					pred_window.append(None)
-				
+					raw_label = "unrecognized"
+
+				# log this frame's raw prediction + inference latency
+				stats.log_frame(raw_label, infer_time_sec)
+
 				# check snapshot
 				smoothed_prediction = get_smoothed_prediction(pred_window, MIN_VOTES)
 				if smoothed_prediction:
 					caption += smoothed_prediction
+					stats.log_committed_letter()
 					# empty snapshot
 					pred_window.clear()
 
@@ -189,3 +202,4 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 # Release resources
 cap.release()
 cv2.destroyAllWindows()
+print(stats.summary())
